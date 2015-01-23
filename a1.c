@@ -81,22 +81,6 @@ void collisionResponse() {
 	float z_cord;
 
   int x, y, z;
-	
-	/*getViewPosition(&x_cord, &y_cord, &z_cord);
-	
-	x_cord = x_cord * -1;
-	y_cord = y_cord * -1;
-	z_cord = z_cord * -1;
-	printf("x:%lf, y:%lf. z:%lf\n",x_cord, y_cord, z_cord);
-	printf("x:%d, y:%d, z:%d\n",(int)x_cord, (int)y_cord, (int)z_cord);
-	if( world[(int)x_cord][(int)y_cord][(int)z_cord] == 0 ){
-		printf("safe\n");
-	}
-	else{
-		getOldViewPosition(&x_cord, &y_cord, &z_cord);
-		setViewPosition(x_cord, y_cord, z_cord);
-		printf("not safe\n");
-	} */
 
   /* get the initial position */
   getViewPosition(&x_cord, &y_cord, &z_cord);
@@ -118,23 +102,10 @@ void collisionResponse() {
     setViewPosition(x_cord, y_cord, z_cord );
   }
 
- // printf("%d, %d, %d\n", x, y, z);
-
   /* apply gravity */
   if( world[x][y][z] == 0 && world[x][y-1][z] == 0 && y > 3 ){
       setViewPosition(x_cord, y_cord + 1, z_cord );
   }
-
-
-
-
-	
-	
-	
-/*	extern void setViewPosition(float, float, float);
-extern void getViewPosition(float *, float *, float *);
-extern void getOldViewPosition(float *, float *, float *);
-extern void getViewOrientation(float *, float *, float *);*/
 
 }
 
@@ -431,44 +402,18 @@ int i, j, k, m, n, l;
           //printf("int: %d\n", intepolateInt);
 
           world[i][intepolateInt][j] = 1;
-         /*	float converter;
-         	
-         	if( randomNoise > 0.00000 ){
-         		
-         		/* convert the noise to be out of 100 *
-         		converter = randomNoise * 100;
-         		
-         		/* limit the scope of the terrain *
-         		if(converter > 5.00000 && converter < 25.00000 ){
-					
-					/* convert double to int *
-         			int converter_int = (int)converter;
-					
-					/* add random altitude block *
-         			world[i][converter_int][j] = 5;
          			
-         			/* fill in the gaps below the cube */
-            if(intepolateInt > 3){
-         		for( l = 3; l < intepolateInt; l++ )
-         			{
-         				world[i][l][j] = 1;
-         			}
-            }
-
-         			/*while( 5 < converter_int ){
-         			
-         				world[i+1][converter_int][j] = 4;
-         				world[i-1][converter_int][j] = 4;
-         				world[i][converter_int][j+1] = 4;
-         				world[i][converter_int][j-1] = 4;
-         				
-         				converter_int --;
-         			}*/
-         	//	}
-         //	}
-         }
+     			/* fill in the gaps below the cube */
+          if(intepolateInt > 3){
+     		     for( l = 3; l < intepolateInt; l++ )
+     			    {
+     				     world[i][l][j] = 1;
+     			    }
+          }
+        }
       }
 
+      /* creating clouds */
       world[35][35][35] = 5;
       world[36][35][36] = 5;
       world[37][35][37] = 5;
@@ -476,9 +421,7 @@ int i, j, k, m, n, l;
       world[37][35][35] = 5;
       world[35][35][37] = 5;
 
-
-
-
+      /* creating clouds */
       world[75][35][75] = 5;
       world[76][35][76] = 5;
       world[77][35][77] = 5;
