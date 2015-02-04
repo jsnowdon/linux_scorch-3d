@@ -81,7 +81,7 @@ typedef struct _mobInfo{
 
 }projectile;
 
-projectile bullet[10];
+projectile bullet[10] = {0,0,0,0,0,0};
 
 
 
@@ -308,7 +308,7 @@ void update() {
           {
               bullet[i].x = bullet[i].x + sin(bullet[i].y_angle * CONVERT_TO_DECIMAL );
               bullet[i].z = bullet[i].z - cos(bullet[i].y_angle * CONVERT_TO_DECIMAL );
-              setMobPosition(0, bullet[i].x, bullet[i].y, bullet[i].z, 0.0);
+              setMobPosition(i, bullet[i].x, bullet[i].y, bullet[i].z, 0.0);
           }
       }
 
