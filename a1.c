@@ -11,8 +11,11 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "graphics.h"
+
+#define CONVERT_TO_DECIMAL 0.0174532925f
 
 	/* mouse function called by GLUT when a button is pressed or released */
 void mouse(int, int, int, int);
@@ -66,6 +69,20 @@ extern void ExtractFrustum();
 extern void tree(float, float, float, float, float, float, int);
 
 /********* end of extern variable declarations **************/
+
+typedef struct _mobInfo{
+  
+  int drawMob;
+  float x;
+  float y;
+  float z;
+  float x_angle;
+  float y_angle;
+
+}projectile;
+
+projectile bullet[10];
+
 
 
 	/*** collisionResponse() ***/
@@ -192,6 +209,31 @@ void update() {
    else 
    {
 
+    static int firstUpdate = 0;
+    static struct timeval tval_oldTime;
+
+    struct timeval tval_curTime, tval_difference;
+
+    /* get the current time */
+    gettimeofday(&tval_curTime, NULL);
+
+    /* ensure that this function has been called at least once */
+    if ( firstUpdate != 0 ){
+
+        /* get the time difference */
+        timersub(&tval_curTime, &tval_oldTime, &tval_difference);
+
+        /* if not enough time between updates dont update */
+        if( (long int)tval_difference.tv_sec < (60 * 2) ){
+          return;
+        }
+    }
+
+    /* make sure to update the old time structure */
+    tval_oldTime.tv_sec = tval_curTime.tv_sec;
+    tval_oldTime.tv_usec = tval_curTime.tv_usec;
+
+
       /********************** CLOUDS *******************************************/
       if ( fallSlow%5 == 0 ) 
       {
@@ -256,7 +298,18 @@ void update() {
           /* erase cloud from old position */
           world[cloudx3+1][48][cloudz3] = 0;
 
-          cloudx3--; 
+          cloudx3--;
+
+      }
+
+      for ( i = 0; i < 10; i++)
+      {
+          if( bullet[i].drawMob == 1)
+          {
+              bullet[i].x = bullet[i].x + sin(bullet[i].y_angle * CONVERT_TO_DECIMAL );
+              bullet[i].z = bullet[i].z - cos(bullet[i].y_angle * CONVERT_TO_DECIMAL );
+              setMobPosition(0, bullet[i].x, bullet[i].y, bullet[i].z, 0.0);
+          }
       }
 
       /*********** GRAVITY AND COLISION DETECTION *******************/
@@ -287,8 +340,45 @@ void update() {
 	/*  released */ 
 void mouse(int button, int state, int x, int y) {
 
-   if (button == GLUT_LEFT_BUTTON)
-      printf("left button - ");
+    float x_orient, mod_x, x_position;
+    float y_orient, mod_y, y_position;
+    float z_orient, mod_z, z_position;
+    static int mobID = 0;
+
+    if (button == GLUT_LEFT_BUTTON)
+    {
+        /* only allow 10 shots at once */
+        if ( mobID >= 9){
+            mobID = 0;
+        }
+
+        printf("left button - ");
+
+        /* get the current mouse orientation */
+        getViewOrientation(&x_orient, &y_orient, &z_orient);
+
+        /* make sure to mod values by 360 degrees */
+        mod_x = fmodf(x_orient, 360.0);
+        mod_y = fmodf(y_orient, 360.0);
+
+        /* get the current view position */
+        getViewPosition(&x_position, &y_position, &z_position);
+
+        /* create the mob */
+        createMob(mobID, -1 * x_position, -1 * y_position, -1 * z_position, 0.0 );
+
+        /* add the new mob to the global array of structures */
+        bullet[mobID].drawMob = 1;
+        bullet[mobID].x = x_position * -1;
+        bullet[mobID].y = y_position * -1;
+        bullet[mobID].z = z_position * -1;
+        bullet[mobID].x_angle = mod_x;
+        bullet[mobID].y_angle = mod_y;
+
+        /* increment number of mobs created */
+        mobID++;
+
+    }
    else if (button == GLUT_MIDDLE_BUTTON)
       printf("middle button - ");
    else
