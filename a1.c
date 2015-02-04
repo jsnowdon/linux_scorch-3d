@@ -462,28 +462,28 @@ int i, j, k, l;
           for(j = 0; j < WORLDZ; j++)
           {
               /* create the noise for the landscape */
-           //   noiseReturn = (uint)(turbulence(i, j, t, 32) / 4) - 13;
+              noiseReturn = (uint)(turbulence(i, j, t, 32) / 4) - 13;
 
               /* make sure no mountains touch any clouds */
-            //  if(noiseReturn >= 48)
-             // {
-               //   noiseReturn = 47;
-             // }
+              if(noiseReturn >= 48)
+              {
+                  noiseReturn = 47;
+              }
 
               /* populate the world */
-             // world[i][noiseReturn][j] = 1;
+              world[i][noiseReturn][j] = 1;
               
               /* fill in the gaps below the cube */
-           //   if(noiseReturn > 3)
-            //  {
-              //    for( l = 3; l < noiseReturn; l++ )
-                //  {
-                  //    world[i][l][j] = 1;
-                 // }
-             // }
+              if(noiseReturn > 3)
+              {
+                  for( l = 3; l < noiseReturn; l++ )
+                  {
+                      world[i][l][j] = 1;
+                  }
+              }
 
               /* get the time */
-             // t = now / 40.0;
+              t = now / 40.0;
           }
       }
 
