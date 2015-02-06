@@ -73,6 +73,7 @@ extern void tree(float, float, float, float, float, float, int);
 typedef struct _mobInfo{
   
   int drawMob;
+  float timeInMotion;
   float x;
   float y;
   float z;
@@ -81,9 +82,12 @@ typedef struct _mobInfo{
 
 }projectile;
 
-projectile bullet[10] = {0,0,0,0,0,0};
+projectile bullet[5] = {0,0,0,0,0,0,0};
 
-
+float velocity = 0.50f;
+float angle = 45.00f;
+int rightButton = 0;
+int reset = 0;
 
 	/*** collisionResponse() ***/
 	/* -performs collision detection and response */
@@ -98,7 +102,7 @@ void collisionResponse() {
    float z_cord;
    static int fallSlowAgain = 0;
 
-   int x, y, z;
+   int x, y, z, i;
 
    /* get the initial position */
    getViewPosition(&x_cord, &y_cord, &z_cord);
@@ -224,7 +228,7 @@ void update() {
         timersub(&tval_curTime, &tval_oldTime, &tval_difference);
 
         /* if not enough time between updates dont update */
-        if( (long int)tval_difference.tv_sec < (60 * 2) ){
+        if( (long int)tval_difference.tv_sec < (60 * 5) ){
           return;
         }
     }
@@ -302,15 +306,58 @@ void update() {
 
       }
 
-      for ( i = 0; i < 10; i++)
+      if ( fallSlow%100 == 0 ){
+          printf("velocity: %lf\n", velocity );
+          printf("angle:%lf\n", angle );
+      }
+
+      for ( i = 0; i < 5; i++)
       {
           if( bullet[i].drawMob == 1)
           {
+
               bullet[i].x = bullet[i].x + sin(bullet[i].y_angle * CONVERT_TO_DECIMAL );
               bullet[i].z = bullet[i].z - cos(bullet[i].y_angle * CONVERT_TO_DECIMAL );
-              setMobPosition(i, bullet[i].x, bullet[i].y, bullet[i].z, 0.0);
+
+              bullet[i].y = bullet[i].y + ( velocity * sin(angle) - 0.5 * 9.81 * ( bullet[i].timeInMotion * bullet[i].timeInMotion ) );
+
+              if( bullet[i].y < 98.0f && bullet[i].y > 3.0f ){
+                setMobPosition(i, bullet[i].x, bullet[i].y, bullet[i].z, 0.0);
+              }
+
+              bullet[i].timeInMotion += 0.01f;
           }
       }
+
+
+      for ( i = 0; i < 5; i++)
+     {
+          if( bullet[i].drawMob == 1)
+          {
+              int cur_x = (int)bullet[i].x;
+              int cur_y = (int)bullet[i].y;
+              int cur_z = (int)bullet[i].z;
+
+              if ( world[cur_x][cur_y][cur_z] != 0){
+                  
+                  /* dont draw this mob again */
+                  bullet[i].drawMob = 0;
+
+                  hideMob(i);
+                  /* destroy land */
+                  world[cur_x][cur_y][cur_z] = 0;
+                  world[cur_x+1][cur_y][cur_z] = 0;
+                  world[cur_x+2][cur_y][cur_z] = 0;
+                  world[cur_x-1][cur_y][cur_z] = 0;
+                  world[cur_x-2][cur_y][cur_z] = 0;
+                  world[cur_x][cur_y-1][cur_z] = 0;
+                  world[cur_x-1][cur_y-1][cur_z] = 0;
+                  world[cur_x+1][cur_y-1][cur_z] = 0;
+                  world[cur_x][cur_y-2][cur_z] = 0;
+
+              }
+          }
+     }
 
       /*********** GRAVITY AND COLISION DETECTION *******************/
 
@@ -332,6 +379,46 @@ void update() {
    }
 }
 
+void MouseMotion(int x, int y)
+{
+  static int initialY;
+  static int initialX;
+  static int firstCall = 0;
+
+  /* Prepare for next click */
+  if ( reset == 1 ){
+    firstCall = 0;
+    reset = 0;
+  }
+
+  /* only keep the inital value */
+  if ( firstCall == 0 ){
+      initialY = y;
+      initialX = x;
+      firstCall++;
+  }
+
+  if( rightButton == 1 && x < initialX && velocity >= 0.005 && velocity <= 1.00 ){
+    velocity = velocity - 0.005;
+    //printf("left:%lf m/s\n", velocity);
+  }
+
+  else if( rightButton == 1 && x > initialX && velocity <= 0.995 && velocity >= 0.00 ){
+    velocity = velocity + 0.005;
+    //printf("right:%lf m/s\n", velocity );
+  }
+
+  else if( rightButton == 1 && y < initialY && angle <= 89.00 && angle >= 0.00 ){
+    angle = angle + 1.0;
+    //printf("up:%lf degrees\n", angle);
+  }
+
+  else if( rightButton == 1 && y > initialY && angle >= 1.00 && angle <= 90.00 ){
+    angle = angle - 1.0;
+    //printf("down:%lf degrees\n", angle );
+  }
+
+}
 
 	/* called by GLUT when a mouse button is pressed or released */
 	/* -button indicates which button was pressed or released */
@@ -343,22 +430,25 @@ void mouse(int button, int state, int x, int y) {
     float x_orient, mod_x, x_position;
     float y_orient, mod_y, y_position;
     float z_orient, mod_z, z_position;
+    int changedVelocity = 0;
+    int changedAngle = 0;
     static int mobID = 0;
+
+
+    /* only allow 10 shots at once */
+    if ( mobID >= 5){
+        mobID = 0;
+    }
 
     if (button == GLUT_LEFT_BUTTON)
     {
-        /* only allow 10 shots at once */
-        if ( mobID >= 9){
-            mobID = 0;
-        }
-
         printf("left button - ");
 
         /* get the current mouse orientation */
         getViewOrientation(&x_orient, &y_orient, &z_orient);
 
         /* make sure to mod values by 360 degrees */
-        mod_x = fmodf(x_orient, 360.0);
+        mod_x = fmodf(x_orient, 90.0);
         mod_y = fmodf(y_orient, 360.0);
 
         /* get the current view position */
@@ -369,27 +459,46 @@ void mouse(int button, int state, int x, int y) {
 
         /* add the new mob to the global array of structures */
         bullet[mobID].drawMob = 1;
+        bullet[mobID].timeInMotion = 0;
         bullet[mobID].x = x_position * -1;
         bullet[mobID].y = y_position * -1;
         bullet[mobID].z = z_position * -1;
         bullet[mobID].x_angle = mod_x;
         bullet[mobID].y_angle = mod_y;
 
-        /* increment number of mobs created */
-        mobID++;
-
     }
-   else if (button == GLUT_MIDDLE_BUTTON)
+    else if (button == GLUT_MIDDLE_BUTTON){
+
       printf("middle button - ");
-   else
+    }
+    else
+    {
       printf("right button - ");
 
-   if (state == GLUT_UP)
-      printf("up - ");
-   else
-      printf("down - ");
+      /* decrease the velocity */
+      if( button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN ){
+          rightButton = 1;
+      }
+      else{
+        rightButton = 0;
+        reset = 1;
+      }
 
-   printf("%d %d\n", x, y);
+
+   /*   while( button == GLUT_RIGHT_BUTTON && state == GLUT_RIGHT && velocity <= 1.0f ){
+          velocity = velocity + 0.05f;
+      }*/
+
+      if (state == GLUT_UP)
+          printf("up - ");
+      else
+          printf("down - ");
+
+      printf("%d %d\n", x, y);
+    }
+
+    /* increment number of mobs created */
+    mobID++;
 }
 
 /**** PERLIN NOISE FUNCTONS ****/
@@ -465,6 +574,9 @@ int main(int argc, char** argv)
 int i, j, k, l;
 	/* initialize the graphics system */
    graphicsInit(&argc, argv);
+
+   /* declare callbacks */
+   glutMotionFunc(MouseMotion);
 
 	/* the first part of this if statement builds a sample */
 	/* world which will be used for testing */
