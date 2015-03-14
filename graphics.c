@@ -76,7 +76,7 @@ float playerPosition[MOB_COUNT][4];
 short playerVisible[MOB_COUNT];
 
 	/* flag indicating the user wants the cube in front of them removed */
-int dig = 0;
+int space = 0;
         /* flag indicates if map is to be printed */
 int displayMap = 1;
 
@@ -659,8 +659,8 @@ static int lighton = 1;
          if (flycontrol == 0) flycontrol = 1;
          else flycontrol = 0;
          break;
-      case ' ':		// toggle dig flag, used to indicate user wants to dig
-         dig = 1;
+      case ' ':		// toggle space flag
+         space = 1;
          break;
       case 'm':		// toggle map display, 0=none, 1=small, 2=large
          displayMap++;

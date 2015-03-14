@@ -68,8 +68,8 @@ extern int flycontrol;
 extern int testWorld;
 	/* flag to print out frames per second */
 extern int fps;
-	/* flag to indicate removal of cube the viewer is facing */
-extern int dig;
+	/* flag to indicate the space bar has been pressed */
+extern int space;
 	/* flag indicates the program is a client when set = 1 */
 extern int netClient;
 	/* flag indicates the program is a server when set = 1 */
@@ -87,6 +87,7 @@ extern void ExtractFrustum();
 extern void tree(float, float, float, float, float, float, int);
 
 /********* end of extern variable declarations **************/
+
 typedef struct _mobInfo{
   
   int drawMob;
@@ -107,6 +108,10 @@ int rightButton = 0;
 int reset = 0;
 int initialY;
 int initialX;
+int gravityFlag = 1;
+int networkMode = 0;
+int firstUpdate = 0;
+time_t old;
 
 /* setup server connections */
 int socketID, clientSocketID;
@@ -166,12 +171,35 @@ void readClientMsg( int *bullet, int *mobID, int *drawMob, float *timeInMotion,
                  x_orient, y_orient, z_orient, gunAngle, gunVelocity);
 }
 
-   /*** collisionResponse() ***/
-   /* -performs collision detection and response */
-   /*  sets new xyz  to position of the viewpoint after collision */
-   /* -can also be used to implement gravity by updating y position of vp*/
-   /* note that the world coordinates returned from getViewPosition()
-      will be the negative value of the array indices */
+/* a function to allow the player to jump 2 vertical square units */
+void jump()
+{
+   int x, y, z;
+   float x_cord, y_cord, z_cord;
+
+   /* get the initial position */
+   getViewPosition(&x_cord, &y_cord, &z_cord);
+
+   printf("in jump: %lf, %lf, %lf\n", x_cord, y_cord, z_cord);
+
+   /* convert the cordinates to positive integers */
+   x = (int)x_cord * -1;
+   y = (int)y_cord * -1;
+   z = (int)z_cord * -1;
+
+   if ( world[x][y][z] == 0 && world[x][y+1][z] == 0 && world[x][y+2][z] == 0 && world[x][y+3][z] == 0 )
+   {
+      /* jump up 2 vertical squares */
+      setViewPosition(x_cord, y_cord - 3, z_cord);
+   }
+}
+
+	/*** collisionResponse() ***/
+	/* -performs collision detection and response */
+	/*  sets new xyz  to position of the viewpoint after collision */
+	/* -can also be used to implement gravity by updating y position of vp*/
+	/* note that the world coordinates returned from getViewPosition()
+	   will be the negative value of the array indices */
 void collisionResponse() 
 {
 
@@ -197,18 +225,19 @@ void collisionResponse()
         setViewPosition(x_cord, y_cord, z_cord );
    }
 
-   /* allow for climbing 1 block if needed */
+   /* allow for climbing 1 block or jump 2 blocks*/
    if( world[x][y][z] != 0 )
    {
-      if( world[x][y+1][z] == 0 )
+      if( world[x][y+1][z] == 0 && world[x][y+2][z] == 0)
       {
           setViewPosition(x_cord, y_cord - 0.5, z_cord );
       }
       else
       {
-          getOldViewPosition(&x_cord, &y_cord, &z_cord);
-          setViewPosition(x_cord, y_cord, z_cord );
+         getOldViewPosition(&x_cord, &y_cord, &z_cord);
+         setViewPosition(x_cord, y_cord, z_cord );
       }
+
    }
 
    /* apply gravity */
@@ -219,6 +248,7 @@ void collisionResponse()
 
    fallSlowAgain++;
 }
+
 
 	/******* draw2D() *******/
 	/* draws 2D shapes on screen */
@@ -247,7 +277,7 @@ void draw2D() {
       GLfloat black[] = {0.0, 0.0, 0.0, 0.5};
       set2Dcolour(black);
       draw2Dbox(500, 380, 524, 388);
-   } 
+   }
    else
    {
       GLfloat red[] = {0.5,0.0,0.0,1.0};
@@ -368,14 +398,13 @@ void draw2D() {
 
 }
 
-
 	/*** update() ***/
 	/* background process, it is called when there are no other events */
 	/* -used to control animations and perform calculations while the  */
 	/*  system is running */
 	/* -gravity must also implemented here, duplicate collisionResponse */
 void update() {
-
+   
    int i, j, k, x, y, z;
    float *la;
    float x_cord;
@@ -437,104 +466,80 @@ void update() {
       if (mob1ry > 360.0) mob1ry -= 360.0;
     /* end testworld animation */
 
-   } 
+   }
    else
    {
-      /* if the server flag is set */
-      if ( netServer == 1 )
+      /* if network mode is on */
+      if ( networkMode == 1 )
       {
-
-         char msg[500000];
-         int index, drawMob, isBullet;
-         float timeInMotion, server_x, server_y, server_z, x_angle, y_angle;
-         float server_XCord, server_YCord, server_ZCord;
-         float server_XOrient, server_YOrient, server_ZOrient;
-         float gunAngle, gunVelocity;
-
-         /* read socket from server */
-         read(clientSocketID, &msg, sizeof(msg));
-
-         /* parse the msg */
-         readClientMsg( &isBullet, &index, &drawMob, &timeInMotion,
-                        &server_x, &server_y, &server_z,
-                        &x_angle, &y_angle, &server_XCord,
-                        &server_YCord, &server_ZCord, &server_XOrient, 
-                        &server_YOrient, &server_ZOrient, &gunAngle, &gunVelocity, msg);
-
-         if( isBullet == 1 )
+         /* if the server flag is set */
+         if ( netServer == 1 )
          {
-            bullet[index].drawMob = drawMob;
-            bullet[index].timeInMotion = timeInMotion;
-            bullet[index].x = server_x;
-            bullet[index].y = server_y;
-            bullet[index].z = server_z;
-            bullet[index].x_angle = x_angle;
-            bullet[index].y_angle = y_angle;
+            char msg[500000];
+            int index, drawMob, isBullet;
+            float timeInMotion, server_x, server_y, server_z, x_angle, y_angle;
+            float server_XCord, server_YCord, server_ZCord;
+            float server_XOrient, server_YOrient, server_ZOrient;
+            float gunAngle, gunVelocity;
+
+            /* read socket from server */
+            read(clientSocketID, &msg, sizeof(msg));
+
+            /* parse the msg */
+            readClientMsg( &isBullet, &index, &drawMob, &timeInMotion,
+                           &server_x, &server_y, &server_z,
+                           &x_angle, &y_angle, &server_XCord,
+                           &server_YCord, &server_ZCord, &server_XOrient, 
+                           &server_YOrient, &server_ZOrient, &gunAngle, &gunVelocity, msg);
+
+            if( isBullet == 1 )
+            {
+               bullet[index].drawMob = drawMob;
+               bullet[index].timeInMotion = timeInMotion;
+               bullet[index].x = server_x;
+               bullet[index].y = server_y;
+               bullet[index].z = server_z;
+               bullet[index].x_angle = x_angle;
+               bullet[index].y_angle = y_angle;
+            }
+
+            /* ensure we as the client are at the same location as the server */
+            setViewPosition(server_XCord, server_YCord, server_ZCord );
+
+            /* set our orientation to look down the barrel of the gun */
+            // 45 is straight
+            // 90 is up
+            // 0 is down
+
+            /* set globals */
+            angle = gunAngle;
+            velocity = gunVelocity;
+
+            if (gunAngle > 45.0)
+            {
+               gunAngle = gunAngle * -1;
+
+               setViewOrientation(server_XOrient, gunAngle, server_ZOrient);
+
+            }
+            else if ( gunAngle < 45.0)
+            {
+               gunAngle = gunAngle * -1;
+
+               setViewOrientation(server_XOrient, gunAngle, server_ZOrient);
+            }
+            else
+            {
+               setViewOrientation(server_XOrient, server_YOrient, server_ZOrient);
+            }
          }
-
-         /* ensure we as the client are at the same location as the server */
-         setViewPosition(server_XCord, server_YCord, server_ZCord );
-
-         /* set our orientation to look down the barrel of the gun */
-         //gunAngle = gunAngle * -1;
-         // 45 is straight
-         // 90 is up
-         // 0 is down
-
-         /* set globals */
-         angle = gunAngle;
-         velocity = gunVelocity;
-
-         if (gunAngle > 45.0)
+         /* if the client flag is set */
+         else if ( netClient = 1 )
          {
-            gunAngle = gunAngle * -1;
-
-            setViewOrientation(server_XOrient, gunAngle, server_ZOrient);
-
-         }
-         else if ( gunAngle < 45.0)
-         {
-            gunAngle = gunAngle * -1;
-
-            setViewOrientation(server_XOrient, gunAngle, server_ZOrient);
-         }
-         else
-         {
-            setViewOrientation(server_XOrient, server_YOrient, server_ZOrient);
+            /* tell server our position */
+            sendMsgToServer( 0, 0, 0, 0, 0, 0, 0, 0, 0 );
          }
       }
-      /* if the client flag is set */
-      else if ( netClient = 1 )
-      {
-         /* tell server our position */
-         sendMsgToServer( 0, 0, 0, 0, 0, 0, 0, 0, 0 );
-      }
-
-      static int firstUpdate = 0;
-      static struct timeval tval_oldTime;
-
-      struct timeval tval_curTime, tval_difference;
-
-      /* get the current time */
-      gettimeofday(&tval_curTime, NULL);
-
-      /* ensure that this function has been called at least once */
-      if ( firstUpdate != 0 )
-      {
-
-        /* get the time difference */
-        timersub(&tval_curTime, &tval_oldTime, &tval_difference);
-
-        /* if not enough time between updates dont update */
-        if( (long int)tval_difference.tv_sec < (60 * 5) )
-        {
-          return;
-        }
-      }
-
-      /* make sure to update the old time structure */
-      tval_oldTime.tv_sec = tval_curTime.tv_sec;
-      tval_oldTime.tv_usec = tval_curTime.tv_usec;
 
       /********************** CLOUDS *******************************************/
       if ( fallSlow%5 == 0 ) 
@@ -604,6 +609,7 @@ void update() {
 
       }
 
+      /****************** BULLETS/PROJECTILES **************************/
       for ( i = 0; i < 5; i++)
       {
           if( bullet[i].drawMob == 1)
@@ -670,14 +676,83 @@ void update() {
       z = (int)z_cord * -1;
 
       /* apply gravity */
-      if( world[x][y][z] == 0 && world[x][y-1][z] == 0 && y > 3 && fallSlow%5 == 0)
+      if( world[x][y][z] == 0 && world[x][y-1][z] == 0 && y > 3 && fallSlow%5 == 0 && gravityFlag == 1)
       {
          setViewPosition(x_cord, y_cord + 1, z_cord );
       }
 
       fallSlow++;
+
+      /********************** JUMPING *******************************/
+      if ( space == 1 )
+      {
+         time_t now;
+         double seconds;
+
+         /* ensure that this function has been called at least once */
+         if ( firstUpdate != 0 )
+         {
+            /* get the current time */
+            time(&now);
+
+            /* calculate the difference in time */
+            seconds = difftime(old, now);
+
+            /* only allow jump every 5 seconds */
+            if ( seconds < 5.0f * -1 )
+            {
+               /* jump 2 vertical square units */
+               jump();
+
+               /* reverse gravity so that the user feels like they have hangtime */
+               gravityFlag = 0;
+
+               printf("space bar pressed again\n");
+
+               /* set old time equal to new time */
+               old = now;
+            }
+         }
+         /* first time through, so get the time of first jump */
+         else
+         {
+            /* set firstUpdate flag */
+            firstUpdate = 1;
+
+            /* capture the time of inital jump */
+            time(&old);
+
+            /* jump 2 vertical square units */
+            jump();
+
+            /* reverse gravity so that the user feels like they have hangtime */
+            gravityFlag = 0;
+
+            printf("space bar pressed\n");
+         }
+
+         /* unset the space bar 'pressed' flag */
+         space = 0;
+      }
+
+      /********************** JUMP HANGTIME ***************************************/
+      time_t now;
+      double seconds;
+
+      /* get the current time */
+      time(&now);
+
+      /* calculate the difference in time */
+      seconds = difftime(old, now);
+
+      /* reset gravity after 1 second hang time */
+      if ( seconds < 0.5f * -1 )
+      {
+         gravityFlag = 1;
+      }
    }
 }
+
 
 	/* called by GLUT when a mouse button is pressed or released */
 	/* -button indicates which button was pressed or released */
@@ -693,7 +768,6 @@ void mouse(int button, int state, int x, int y) {
    int changedAngle = 0;
    static int mobID = 0;
 
-
    /* only allow 10 shots at once */
    if ( mobID >= 5)
    {
@@ -704,7 +778,10 @@ void mouse(int button, int state, int x, int y) {
    {
         printf("left button - ");
 
-        if ( netClient == 1 )
+        /* if in network mode only allow the client to shoot a bullet,
+           if not in network mode allow user to shoot a bullet
+        */
+        if( netClient == 1 || networkMode == 0)
         {
            /* get the current mouse orientation */
            getViewOrientation(&x_orient, &y_orient, &z_orient);
@@ -728,10 +805,14 @@ void mouse(int button, int state, int x, int y) {
            bullet[mobID].x_angle = mod_x;
            bullet[mobID].y_angle = mod_y;
 
-            /* send over the bullet information */
-            sendMsgToServer( 1, mobID, bullet[mobID].drawMob, bullet[mobID].timeInMotion,
+           /* only need to send message in networking mode */
+           if ( netClient == 1 )
+           {
+               /* send over the bullet information */
+               sendMsgToServer( 1, mobID, bullet[mobID].drawMob, bullet[mobID].timeInMotion,
                              bullet[mobID].x, bullet[mobID].y, bullet[mobID].z,
                              bullet[mobID].x_angle, bullet[mobID].y_angle );
+           }
         }
    }
    else if (button == GLUT_MIDDLE_BUTTON)
@@ -743,41 +824,49 @@ void mouse(int button, int state, int x, int y) {
    {
       printf("right button - ");
 
-      if( netClient == 1 )
+      /* if in network mode only allow the client to move cannon,
+         if not in network mode allow user to move cannon
+      */
+      if( netClient == 1 || networkMode == 0)
       {
          /* decrease the velocity */
          if( button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN )
          {
-             initialY = y;
-             initialX = x;
-             printf("xy before: %d,%d\n",x,y );
+            initialY = y;
+            initialX = x;
+            printf("xy before: %d,%d\n",x,y );
          }
          if( button == GLUT_RIGHT_BUTTON && state == GLUT_UP )
          {
-           printf("xy after: %d,%d\n",x,y );
+            printf("xy after: %d,%d\n",x,y );
          }
 
-         if( x < initialX && velocity >= 0.005 && velocity <= 1.00 ){
+         if( x < initialX && velocity >= 0.005 && velocity <= 1.00 )
+         {
             velocity = velocity - 0.005;
             printf("left:%lf m/s\n", velocity );
          }
 
-         else if( x > initialX && velocity <= 0.995 && velocity >= 0.00 ){
+         else if( x > initialX && velocity <= 0.995 && velocity >= 0.00 )
+         {
             velocity = velocity + 0.005;
             printf("right:%lf m/s\n", velocity );
          }
 
-         if( y < initialY && angle <= 89.00 && angle >= 0.00 ){
+         if( y < initialY && angle <= 89.00 && angle >= 0.00 )
+         {
             angle = angle + 5.0;
             printf("up:%lf degrees\n", angle);
          }
 
-         else if( y > initialY && angle >= 1.00 && angle <= 90.00 ){
+         else if( y > initialY && angle >= 1.00 && angle <= 90.00 )
+         {
             angle = angle - 5.0;
             printf("down:%lf degrees\n", angle );
          }
 
-         if ( netClient = 1 )
+         /* only need to send message in networking mode */
+         if ( netClient == 1 )
          {
             /* tell server our new angle */
             sendMsgToServer( 0, 0, 0, 0, 0, 0, 0, 0, 0 );
@@ -856,6 +945,7 @@ double turbulence(double x, double y, double z, double size)
 /********* End of Perlin Noise Functions *****************/
 
 
+
 int main(int argc, char** argv)
 {
 int i, j, k, l;
@@ -907,11 +997,84 @@ int i, j, k, l;
 	/* create sample player */
       createPlayer(0, 52.0, 27.0, 52.0, 0.0);
 
-   } 
-  /* code for world */
-  else
-  {
+   }
+   /* check if networking is off */
+   else if ( netServer == 0 && netClient == 0)
+   {
+      /* start creating the world */
+      float randomNoise;
    
+      /* Initialize the world as empty */
+      for(i = 0; i < WORLDX; i++)
+      {
+         for(j = 0; j < WORLDY; j++)
+         {
+            for(k = 0; k < WORLDZ; k++)
+            {
+               world[i][j][k] = 0;
+            }
+         } 
+      }
+
+      /* Create the ground */
+      for(i = 0; i < WORLDX; i++) 
+      {
+         for(j = 0; j < WORLDZ; j++) 
+         {
+               world[i][3][j] = 8;
+         }
+      }
+
+      /* create some random noise */
+      generateNoise();
+    
+      int noiseReturn;
+      double t;
+      time_t now;
+      int x, y;
+               
+      /* Create world using Perlin noise algo */
+      for(i = 0; i < WORLDX; i++) 
+      {
+          now = time(0);
+
+          for(j = 0; j < WORLDZ; j++)
+          {
+              /* create the noise for the landscape */
+              noiseReturn = (int)(turbulence(i, j, t, 32) / 4) - 13;
+
+              /* make sure no mountains touch any clouds */
+              if(noiseReturn >= 48)
+              {
+                  noiseReturn = 47;
+              }
+
+              /* populate the world */
+              world[i][noiseReturn][j] = 1;
+              
+              /* fill in the gaps below the cube */
+              if(noiseReturn > 3)
+              {
+                  for( l = 3; l < noiseReturn; l++ )
+                  {
+                      world[i][l][j] = 1;
+                  }
+              }
+
+              /* get the time */
+              t = now / 40.0;
+          }
+      }
+
+      /* create an A.I. opponent */
+      createPlayer(0, 52.0, 40.0, 52.0, 0.0);
+   }
+   /* networking on */
+   else
+   {
+      /* set network mode flag to true */
+      networkMode = 1;
+
       if ( netServer == 1 )
       {
          /* start creating the world */
@@ -1060,13 +1223,22 @@ int i, j, k, l;
             } 
          }
       }
+
+      /* create an A.I. opponent */
+      createPlayer(0, 52.0, 40.0, 52.0, 0.0);
    }
 
-	/* starts the graphics processing loop */
-	/* code after this will not run until the program exits */
+   /* starts the graphics processing loop */
+   /* code after this will not run until the program exits */
    glutMainLoop();
-   /* close socket when game exits */
-   close( socketID );
+
+   /* only close the socket if the networking was on */
+   if( networkMode == 1 )
+   {
+      /* close socket when game exits */
+      close( socketID );
+   }
+
    return 0; 
 }
 
