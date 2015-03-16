@@ -70,8 +70,8 @@ float mobPosition[MOB_COUNT][4];
 	/* visibility of mobs, 0 not drawn, 1 drawn */
 short mobVisible[MOB_COUNT];
 
-	/* list of players - number of mobs, xyz values and rotation about y */
-float playerPosition[MOB_COUNT][4];
+	/* list of players - number of mobs, xyz values, rotation about y, previous xyz values and previous rotation about y */
+float playerPosition[MOB_COUNT][8];
 	/* visibility of players, 0 not drawn, 1 drawn */
 short playerVisible[MOB_COUNT];
 
@@ -99,6 +99,10 @@ int i;
       playerPosition[i][1] = 0.0;
       playerPosition[i][2] = 0.0;
       playerPosition[i][3] = 0.0;
+      playerPosition[i][4] = 0.0;
+      playerPosition[i][5] = 0.0;
+      playerPosition[i][6] = 0.0;
+      playerPosition[i][7] = 0.0;
       playerVisible[i] = 0;
    }
 }
@@ -123,10 +127,39 @@ void setPlayerPosition(int number, float x, float y, float z, float playerroty){
       printf("ERROR: player number greater than %d\n", PLAYER_COUNT);
       exit(1);
    }
+   /* save old position first */
+   playerPosition[number][4] = playerPosition[number][0];
+   playerPosition[number][5] = playerPosition[number][1];
+   playerPosition[number][6] = playerPosition[number][2];
+   playerPosition[number][7] = playerPosition[number][3];
+
+   /* move player to new position */
    playerPosition[number][0] = x;
    playerPosition[number][1] = y;
    playerPosition[number][2] = z;
    playerPosition[number][3] = playerroty;
+}
+   /* function to store and return the current location of the player */
+void getPlayerPosition(int number, float *x, float *y, float*z, float *playerroty){
+   if (number >= PLAYER_COUNT) {
+      printf("ERROR: player number greater than %d\n", PLAYER_COUNT);
+      exit(1);
+   }
+   *x = playerPosition[number][0];
+   *y = playerPosition[number][1];
+   *z = playerPosition[number][2];
+   *playerroty = playerPosition[number][3];
+}
+   /* returns the previous location of the player */
+void getOldPlayerPosition(int number, float *x, float *y, float*z, float *playerroty){
+   if (number >= PLAYER_COUNT) {
+      printf("ERROR: player number greater than %d\n", PLAYER_COUNT);
+      exit(1);
+   }
+   *x = playerPosition[number][4];
+   *y = playerPosition[number][5];
+   *z = playerPosition[number][6];
+   *playerroty = playerPosition[number][7];
 }
 
 	/* turn off drawing for player number */
@@ -146,8 +179,6 @@ void showPlayer(int number) {
    }
    playerVisible[number] = 1;
 }
-
-
 
 	/* mob control functions */
 	/* set all mob location, rotation, and visibility values to zero */
